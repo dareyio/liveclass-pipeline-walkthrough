@@ -4,4 +4,4 @@ image:
   repository: dareyregistry/monolith
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "1.0.5"
+  tag: "1.0.6"
