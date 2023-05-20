@@ -1,0 +1,14 @@
+apiVersion: v1
+entries:
+  monolith-website:
+  - apiVersion: v2
+    appVersion: 1.16.0
+    created: "2023-05-20T21:28:46.970199+01:00"
+    description: A Helm chart for Kubernetes
+    digest: 661ac682ff82f6776ce5f968c4fa4fffe9b4a4bf089cbd1ae4ed1bbeb2ffe2b3
+    name: monolith-website
+    type: application
+    urls:
+    - https://liveclass-helm-repo.s3.amazonaws.com/charts/monolith-website-0.1.0.tgz
+    version: 0.1.0
+generated: "2023-05-20T21:28:46.969335+01:00"

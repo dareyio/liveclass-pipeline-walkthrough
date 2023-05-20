@@ -1,0 +1,52 @@
+name: Publish Helm Chart
+
+on:
+  workflow_run:
+    workflows:
+      - "Build and Push Docker Images"
+    types:
+      - completed
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: "eu-west-2"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Package Helm Chart
+        run: |
+            cd helm
+            rm -f *.tgz
+            helm package monolith-website
+
+      - name: Upload Helm Chart to S3
+        run: aws s3 cp monolith-website-0.1.0.tgz s3://liveclass-helm-repo/monolith-website-0.1.0.tgz
+
+      - name: Generate or Update Helm Chart Index
+        run: helm repo index --url https://liveclass-helm-repo.s3.amazonaws.com/charts/ .
+
+      - name: Upload Index.yaml to S3
+        run: aws s3 cp index.yaml s3://liveclass-helm-repo/charts/index.yaml
+
+      - name: Install the Helm S3 plugin
+        run: helm plugin install https://github.com/hypnoglow/helm-s3.git
+
+      - name: Configure Helm Repository
+        run: helm repo add monolith-website s3://liveclass-helm-repo/charts
+
+      - name: Push Helm Chart to S3 Repository
+        run: helm s3 push --force monolith-website-0.1.0.tgz monolith-website
