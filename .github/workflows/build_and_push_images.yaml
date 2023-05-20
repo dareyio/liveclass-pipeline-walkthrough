@@ -11,7 +11,7 @@ on:
 env:
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
   DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-  appVersion: 1.0.4
+  appVersion: 1.0.5
 
 jobs:
   build-and-push:

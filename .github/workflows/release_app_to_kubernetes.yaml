@@ -1,0 +1,56 @@
+name: Deploy to Amazon EKS
+
+on:
+  workflow_run:
+    workflows:
+      - "Publish Helm Chart (Dynamic version)"
+    types:
+      - completed
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: eu-west-2
+      EKS_CLUSTER_NAME: nonprod-dev
+      S3_BUCKET_NAME: liveclass-helm-repo
+      K8S_NAMESPACE: liveclass
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install the Helm S3 plugin
+        run: helm plugin install https://github.com/hypnoglow/helm-s3.git
+
+      - name: Add Helm Repo
+        run: helm repo add monolith-website s3://liveclass-helm-repo/charts
+
+      - name: Download the helm chart
+        run: helm fetch  monolith-website/monolith-website
+
+      - name: Extract Helm Chart
+        run: |
+            tar -zxvf monolith-website-*.tgz
+
+      - name: Update kubeconfig
+        run: |
+            aws eks update-kubeconfig --name nonprod-dev --region ${{ env.AWS_REGION }}
+
+      - name: Deploy website into K8s cluster
+        run: |
+            pwd
+            ls -latr
+            helm upgrade -i monolith-app monolith-website -n ${{ env.K8S_NAMESPACE }} -f helm/environments/prod/values.yaml
+
+      - name: Validate Deployment
+        run: kubectl rollout status deployment/monolith-app-monolith-website --namespace ${{ env.K8S_NAMESPACE }}

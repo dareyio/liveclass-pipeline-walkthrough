@@ -1,0 +1,67 @@
+name: Publish Helm Chart (Dynamic version)
+
+on:
+  workflow_run:
+    workflows:
+      - "Build and Push Docker Images"
+    types:
+      - completed
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: "eu-west-2"
+      S3_BUCKET_NAME: liveclass-helm-repo
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Package Helm Chart
+        run: |
+            cd helm
+            rm -f *.tgz
+            helm package monolith-website
+
+# The command ::set-output name=path::$(find helm -name '*.tgz') is not a standard bash command. It's a syntax used in GitHub Actions workflows to set an output value for use in subsequent steps.
+# The syntax ::set-output name=<name>::<value> is used to set the value of an output variable.
+# In the specific example you mentioned, the command ::set-output name=path::$(find helm -name '*.tgz') sets the output variable named path to the result of the find command, which searches for files with the .tgz extension in the helm directory.
+# This syntax is specific to GitHub Actions workflows and cannot be directly used in a regular bash shell.
+
+
+      - name: Determine Helm Chart TGZ Path
+        id: helm-chart-path
+        run: echo "::set-output name=helmchart_tgz_path::$(find helm -name '*.tgz')"
+
+      - name: Retrieve Helm Chart Filename
+        id: helm-chart-filename
+        run: echo "::set-output name=helmchart_tgz_file::$(basename ${{ steps.helm-chart-path.outputs.helmchart_tgz_path }})"
+
+      - name: Upload Helm Chart to S3
+        run: aws s3 cp ${{ steps.helm-chart-path.outputs.helmchart_tgz_path }} s3://${{ env.S3_BUCKET_NAME }}/${{ steps.helm-chart-filename.outputs.helmchart_tgz_file }}
+
+      - name: Generate or Update Helm Chart Index
+        run: helm repo index --url s3://${{ env.S3_BUCKET_NAME }}/charts/ .
+
+      - name: Upload Index.yaml to S3
+        run: aws s3 cp index.yaml s3://${{ env.S3_BUCKET_NAME }}/charts/index.yaml
+
+      - name: Install the Helm S3 plugin
+        run: helm plugin install https://github.com/hypnoglow/helm-s3.git
+
+      - name: Configure Helm Repository
+        run: helm repo add monolith-website s3://${{ env.S3_BUCKET_NAME }}/charts
+
+      - name: Push Helm Chart to S3 Repository
+        run: helm s3 push --force ${{ steps.helm-chart-path.outputs.helmchart_tgz_path }} monolith-website
