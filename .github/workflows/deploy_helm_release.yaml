@@ -53,4 +53,4 @@ jobs:
         run: helm repo add monolith-website s3://liveclass-helm-repo/charts
 
       - name: Push Helm Chart to S3 Repository
-        run: helm s3 push --force monolith-website-0.1.0.tgz monolith-website
+        run: helm s3 push --force helm/monolith-website-0.1.0.tgz monolith-website
